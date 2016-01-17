@@ -1,0 +1,412 @@
+Not ready for use, still in preliminary development
+* Installation
+#+BEGIN_SRC sh
+sudo apt-get --assume-yes install rake ruby-dev
+cd Viewpoint; rake; sudo gem install ./viewpoint-1.0.0.gem
+#+END_SRC
+
+* Viewpoint documentation
+** github https://github.com/WinRb/Viewpoint
+** docs at http://www.rubydoc.info/github/WinRb/Viewpoint/frames
+** blog at http://distributed-frostbite.blogspot.com/2010/08/viewpoint-for-exchange-web-services.html#comment-form
+
+* Notes
+** microsoft EWS api at https://msdn.microsoft.com/en-us/library/office/dd633696(v=exchg.80).aspx
+
+** Using Exchange Web Services to create appointments in the Google Calendar using the Google Calendar API
+http://gsexdev.blogspot.com/2007/06/using-exchange-web-services-to-create.html
+#+BEGIN_SRC C++
+  using System;
+  using System.Collections;
+  using System.Collections.Generic;
+  using System.Text;
+  using System.Net;
+  using System.IO;
+  using System.Xml;
+  using System.Security.Cryptography.X509Certificates;
+  using System.Net.Security;
+  using ewsSync.EWS;
+  using Google.GData.Calendar;
+  using Google.GData.Client;
+  using Google.GData.Extensions;
+
+  namespace ewsSync
+  {
+      class Program
+      {
+          static void Main(string[] args)
+          {
+              String guGCalUserName = "username@gmail.com";
+              String gpGCalPassword = "password";
+              String exUserName = "username";
+              String exDomain = "domain";
+              String exPassword = "password";
+              String sfSyncFilePath = @"c:\google-Calendar.xml";
+              String exBindingURL = @"https://servername/EWS/exchange.asmx";
+              String cuCalendarURL = "http://www.google.com/calendar/feeds/" + guGCalUserName
+                  + "/private/full";
+
+              //Athentic to Google Calendar
+              CalendarService csGoogleCalendarServer = new CalendarService("EWS-Cal-Sync");
+              csGoogleCalendarServer.setUserCredentials(guGCalUserName, gpGCalPassword);
+              //Deal with Self Signed Certificate Errors
+              ServicePointManager.ServerCertificateValidationCallback = delegate(Object obj,
+                                                                                 X509Certificate certificate, X509Chain chain, SslPolicyErrors errors)
+                  {
+                      return true;
+                  }
+              ;
+
+              String fnSyncFileName = sfSyncFilePath;
+              ExchangeServiceBinding ewsServiceBinding = new ExchangeServiceBinding();
+              ewsServiceBinding.Credentials = new
+                  NetworkCredential(exUserName,exPassword,exDomain);
+              ewsServiceBinding.Url = exBindingURL;
+              if (File.Exists(fnSyncFileName)) {
+                  Program.PartialSync(ewsServiceBinding,
+                                      fnSyncFileName,csGoogleCalendarServer,cuCalendarURL);
+              } else {
+                  Program.InitialSync(ewsServiceBinding,
+                                      fnSyncFileName,csGoogleCalendarServer,cuCalendarURL);
+
+              }
+
+          }
+          static private void InitialSync(ExchangeServiceBinding ewsServiceBinding, string
+                                          fnSyncFileName, CalendarService csGoogleCalendarServer, string cuCalendarURL)
+          {
+              XmlDocument sfSyncFile = new XmlDocument();
+              StringWriter xsXmlString = new StringWriter();
+              XmlWriter xrXmlWritter = new XmlTextWriter(xsXmlString);
+              xrXmlWritter.WriteStartDocument();
+              xrXmlWritter.WriteStartElement("CalendarSync");
+              SyncFolderItemsType siSyncItemsRequest = new SyncFolderItemsType();
+              siSyncItemsRequest.ItemShape = new ItemResponseShapeType();
+              siSyncItemsRequest.ItemShape.BaseShape = DefaultShapeNamesType.IdOnly;
+              siSyncItemsRequest.SyncFolderId = new TargetFolderIdType();
+              DistinguishedFolderIdType cfCalendar = new DistinguishedFolderIdType();
+              cfCalendar.Id = DistinguishedFolderIdNameType.calendar;
+              siSyncItemsRequest.SyncFolderId.Item = cfCalendar;
+              siSyncItemsRequest.MaxChangesReturned = 512;
+              SyncFolderItemsResponseType syncItemsResponse =
+                  ewsServiceBinding.SyncFolderItems(siSyncItemsRequest);
+              SyncFolderItemsResponseMessageType responseMessage = new
+                  SyncFolderItemsResponseMessageType();
+              responseMessage = syncItemsResponse.ResponseMessages.Items[0] as
+                  SyncFolderItemsResponseMessageType;
+              if (responseMessage.ResponseClass == ResponseClassType.Error) {
+                  throw new Exception(responseMessage.MessageText);
+              } else {
+                  xrXmlWritter.WriteAttributeString("SyncState",responseMessage.SyncState);
+                  xrXmlWritter.WriteEndElement();
+                  xrXmlWritter.WriteEndDocument();
+                  sfSyncFile.LoadXml(xsXmlString.ToString());
+                  sfSyncFile.Save(fnSyncFileName);
+                  string changes = responseMessage.Changes.Items.Length.ToString();
+                  Console.WriteLine("Number of items to synchronize: " + changes);
+                  Int32 ncNumberOfChanges = responseMessage.Changes.Items.Length;
+                  for (int scSyncChange = 0; scSyncChange < ncNumberOfChanges; scSyncChange++) {
+                      Console.WriteLine(responseMessage.Changes.ItemsElementName[scSyncChange].ToString());
+                      switch (responseMessage.Changes.ItemsElementName[scSyncChange].ToString())
+                      {
+                      case "Delete": SyncFolderItemsDeleteType diDeletedItem =
+                              (SyncFolderItemsDeleteType)responseMessage.Changes.Items[scSyncChange];
+                          break;
+                      case "Create": SyncFolderItemsCreateOrUpdateType ciCreateItem =
+                              (SyncFolderItemsCreateOrUpdateType)responseMessage.Changes.Items[scSyncChange];
+                          createGoogleCalItem(ciCreateItem, ewsServiceBinding,
+                                              csGoogleCalendarServer,cuCalendarURL);
+                          break;
+                      case "Update": SyncFolderItemsCreateOrUpdateType uiUpdateItem =
+                              (SyncFolderItemsCreateOrUpdateType)responseMessage.Changes.Items[scSyncChange];
+                          modifyGoolgCalItem(uiUpdateItem, ewsServiceBinding, csGoogleCalendarServer);
+                          break;
+
+                      }
+                  }
+              }
+          }
+          private static void PartialSync(ExchangeServiceBinding ewsServiceBinding, string
+                                          fnSyncFileName, CalendarService csGoogleCalendarServer, string cuCalendarURL)
+          {
+              string ssSyncState = "";
+              XmlDocument sfSyncFile = new XmlDocument();
+              sfSyncFile.Load(fnSyncFileName);
+              XmlNodeList snSyncStateNodes = sfSyncFile.SelectNodes("//CalendarSync");
+              foreach (XmlNode xnSyncNode in snSyncStateNodes) {
+                  ssSyncState = xnSyncNode.Attributes.GetNamedItem("SyncState").Value;
+              }
+
+              SyncFolderItemsType siSyncItemsRequest = new SyncFolderItemsType();
+              siSyncItemsRequest.ItemShape = new ItemResponseShapeType();
+              siSyncItemsRequest.ItemShape.BaseShape = DefaultShapeNamesType.IdOnly;
+              siSyncItemsRequest.SyncFolderId = new TargetFolderIdType();
+              DistinguishedFolderIdType cfCalendar = new DistinguishedFolderIdType();
+              cfCalendar.Id = DistinguishedFolderIdNameType.calendar;
+              siSyncItemsRequest.SyncFolderId.Item = cfCalendar;
+              siSyncItemsRequest.SyncState = ssSyncState;
+              siSyncItemsRequest.MaxChangesReturned = 512;
+              SyncFolderItemsResponseType syncItemsResponse =
+                  ewsServiceBinding.SyncFolderItems(siSyncItemsRequest);
+              SyncFolderItemsResponseMessageType responseMessage = new
+                  SyncFolderItemsResponseMessageType();
+              responseMessage = syncItemsResponse.ResponseMessages.Items[0] as
+                  SyncFolderItemsResponseMessageType;
+              if (responseMessage.ResponseClass == ResponseClassType.Error) {
+                  throw new Exception(responseMessage.MessageText);
+              } else {
+                  foreach (XmlNode xnSyncNode in snSyncStateNodes) {
+                      xnSyncNode.Attributes.GetNamedItem("SyncState").Value =
+                          responseMessage.SyncState;
+                  }
+                  sfSyncFile.Save(fnSyncFileName);
+                  if (responseMessage.Changes.Items == null) {
+                      Console.WriteLine("Nothing to Syncronise");
+                  } else {
+                      Int32 ncNumberOfChanges = responseMessage.Changes.Items.Length;
+
+                      Console.WriteLine("Number of items to synchronize: " +
+                                        ncNumberOfChanges.ToString());
+                      for (int scSyncChange=0;scSyncChange < ncNumberOfChanges ;scSyncChange++) {
+                          Console.WriteLine(responseMessage.Changes.ItemsElementName[scSyncChange].ToString());
+                          switch (responseMessage.Changes.ItemsElementName[scSyncChange].ToString()){
+                          case "Delete" : SyncFolderItemsDeleteType diDeletedItem =
+                                  (SyncFolderItemsDeleteType)responseMessage.Changes.Items[scSyncChange];
+                              break ;
+                          case "Create": SyncFolderItemsCreateOrUpdateType ciCreateItem =
+                                  (SyncFolderItemsCreateOrUpdateType)responseMessage.Changes.Items[scSyncChange];
+                              createGoogleCalItem(ciCreateItem,ewsServiceBinding,
+                                                  csGoogleCalendarServer,cuCalendarURL);
+                              break ;
+                          case "Update": SyncFolderItemsCreateOrUpdateType uiUpdateItem =
+                                  (SyncFolderItemsCreateOrUpdateType)responseMessage.Changes.Items[scSyncChange];
+                              modifyGoolgCalItem(uiUpdateItem, ewsServiceBinding, csGoogleCalendarServer);
+                              break;
+
+                          }
+
+                      }
+
+                  }
+              }
+
+          }
+          private static void modifyGoolgCalItem(SyncFolderItemsCreateOrUpdateType
+                                                 ciCreateItem, ExchangeServiceBinding ewsServiceBinding, CalendarService
+                                                 csGoogleCalendarServer) {
+
+
+          }
+          private static void createGoogleCalItem(SyncFolderItemsCreateOrUpdateType
+                                                  ciCreateItem, ExchangeServiceBinding ewsServiceBinding, CalendarService
+                                                  csGoogleCalendarServer, String cuCalendarURL)
+          {
+
+
+              GetItemType giRequest = new GetItemType();
+              ItemIdType iiItemId = new ItemIdType();
+              iiItemId.Id = ciCreateItem.Item.ItemId.Id;
+              iiItemId.ChangeKey = ciCreateItem.Item.ItemId.ChangeKey;
+              ItemResponseShapeType giResponseShape = new ItemResponseShapeType();
+              giResponseShape.BaseShape = DefaultShapeNamesType.AllProperties;
+              giResponseShape.IncludeMimeContent = true;
+              giRequest.ItemShape = giResponseShape;
+
+              giRequest.ItemIds = new ItemIdType[1];
+              giRequest.ItemIds[0] = iiItemId;
+              giRequest.ItemShape.BaseShape = DefaultShapeNamesType.AllProperties;
+              giRequest.ItemShape.IncludeMimeContent = true;
+              giRequest.ItemShape.BodyType = BodyTypeResponseType.Text;
+              giRequest.ItemShape.BodyTypeSpecified = true;
+
+              GetItemResponseType giResponse = ewsServiceBinding.GetItem(giRequest);
+              if (giResponse.ResponseMessages.Items[0].ResponseClass ==
+                  ResponseClassType.Error) {
+                  Console.WriteLine("Error Occured");
+                  Console.WriteLine(giResponse.ResponseMessages.Items[0].MessageText);
+              } else {
+                  ItemInfoResponseMessageType rmResponseMessage =
+                      giResponse.ResponseMessages.Items[0] as ItemInfoResponseMessageType;
+                  CalendarItemType ciCalentry =
+                      (CalendarItemType)rmResponseMessage.Items.Items[0];
+                  EventEntry ceCalendarEntry = new EventEntry();
+                  ceCalendarEntry.Title.Text = ciCalentry.Subject;
+                  if (ciCalentry.Body != null) {
+                      ceCalendarEntry.Content.Content =
+                          ciCalentry.Body.Value;
+                  }
+                  AtomPerson auAuthor = new AtomPerson(AtomPersonType.Author);
+                  auAuthor.Name = ciCalentry.Organizer.Item.Name;
+                  auAuthor.Email = ciCalentry.Organizer.Item.EmailAddress;
+                  ceCalendarEntry.Authors.Add(auAuthor);
+
+                  When cwCalenderWhen = new When();
+
+                  if (ciCalentry.IsAllDayEvent == true) {
+                      cwCalenderWhen.StartTime = ciCalentry.Start.ToLocalTime();
+                      cwCalenderWhen.EndTime = ciCalentry.End.ToLocalTime();
+                      cwCalenderWhen.AllDay = true;
+                  } else {
+                      if (ciCalentry.CalendarItemType1 == CalendarItemTypeType.RecurringMaster) {
+
+                          RecurrenceType rtRecurrance = ciCalentry.Recurrence;
+                          RecurrenceRangeBaseType rrRecurranceRange = rtRecurrance.Item1;
+                          String rpRecurData = "DTSTART:" + ciCalentry.Start.ToString("yyyyMMddTHHmmssZ")
+                              + " \r\n"
+                              + "DTEND:" + ciCalentry.End.ToString("yyyyMMddTHHmmssZ") + " \r\n";
+                          string mdDay;
+                          int frFirstRun = 0;
+                          Hashtable mhMonthhash = new Hashtable();
+                          string msMonthString = "jan,feb,mar,apr,may,jun,jul,aug,sep,oct,nov,dec";
+                          string[] ysYearMonths = msMonthString.Split((char)44);
+                          int mval = 1;
+                          foreach (string msMonth in ysYearMonths) {
+                              mhMonthhash.Add(msMonth, mval);
+                              mval++;
+                          }
+                          RecurrencePatternBaseType rpRecurrancePattern = rtRecurrance.Item;
+                          String rtRecuranceType = rpRecurrancePattern.GetType().Name.ToString();
+                          switch (rtRecuranceType) {
+                          case "WeeklyRecurrencePatternType": WeeklyRecurrencePatternType
+                                  wpWeeklyRecurrence = (WeeklyRecurrencePatternType)rpRecurrancePattern;
+                              rpRecurData = rpRecurData + "RRULE:FREQ=WEEKLY;BYDAY=";
+                              frFirstRun = 0;
+                              string[] WeekDays = wpWeeklyRecurrence.DaysOfWeek.Split((char)32);
+                              foreach (string dsDay in WeekDays) {
+                                  if (frFirstRun == 0) {
+                                      rpRecurData = rpRecurData + dsDay.Substring(0, 2);
+                                      frFirstRun = 1;
+                                  } else {
+                                      rpRecurData = rpRecurData + "," + dsDay.Substring(0, 2);
+                                  }
+                              }
+                              rpRecurData = rpRecurData + ";";
+                              break ;
+                          case "DailyRecurrencePatternType": DailyRecurrencePatternType dpDailyRecurrence
+                                  = (DailyRecurrencePatternType)rpRecurrancePattern;
+                              rpRecurData = rpRecurData + "RRULE:FREQ=DAILY;INTERVAL=" +
+                                  dpDailyRecurrence.Interval.ToString() + ";";
+                              break;
+                          case "AbsoluteMonthlyRecurrencePatternType":
+                              AbsoluteMonthlyRecurrencePatternType amMonthlyrecurance =
+                                  (AbsoluteMonthlyRecurrencePatternType)rpRecurrancePattern;
+                              rpRecurData = rpRecurData + "RRULE:FREQ=MONTHLY;INTERVAL=" +
+                                  amMonthlyrecurance.Interval.ToString() + ";";
+                              rpRecurData = rpRecurData + "BYMONTHDAY=" +
+                                  amMonthlyrecurance.DayOfMonth.ToString();
+                              rpRecurData = rpRecurData + ";";
+                              break;
+                          case "RelativeMonthlyRecurrencePatternType":
+                              RelativeMonthlyRecurrencePatternType rmMonthlyrecurance =
+                                  (RelativeMonthlyRecurrencePatternType)rpRecurrancePattern;
+                              rpRecurData = rpRecurData + "RRULE:FREQ=MONTHLY;INTERVAL=" +
+                                  rmMonthlyrecurance.Interval.ToString() + ";";
+                              rpRecurData = rpRecurData + "BYDAY=";
+                              mdDay = rmMonthlyrecurance.DaysOfWeek.ToString().Substring(0, 2);
+                              switch (rmMonthlyrecurance.DayOfWeekIndex.ToString())
+                              {
+                              case "First": rpRecurData = rpRecurData + "1" + mdDay;
+                                  break;
+                              case "Second": rpRecurData = rpRecurData + "2" + mdDay;
+                                  break;
+                              case "Third": rpRecurData = rpRecurData + "3" + mdDay;
+                                  break;
+                              case "Fourth": rpRecurData = rpRecurData + "4" + mdDay;
+                                  break;
+                              case "Last": rpRecurData = rpRecurData + "-1" + mdDay;
+                                  break;
+
+                              }
+                              rpRecurData = rpRecurData + ";";
+                              break;
+                          case "RelativeYearlyRecurrencePatternType": RelativeYearlyRecurrencePatternType
+                                  ypYearlyRecurrance = (RelativeYearlyRecurrencePatternType)rpRecurrancePattern;
+                              rpRecurData = rpRecurData + "RRULE:FREQ=YEARLY;";
+                              rpRecurData = rpRecurData + "BYMONTH=" +
+                                  mhMonthhash[ypYearlyRecurrance.Month.ToString().ToLower().Substring(0,
+                                                                                                      3)].ToString() + ";";
+                              mdDay = ypYearlyRecurrance.DaysOfWeek.ToString().Substring(0, 2);
+                              rpRecurData = rpRecurData + "BYDAY=";
+                              switch (ypYearlyRecurrance.DayOfWeekIndex.ToString())
+                              {
+                              case "First": rpRecurData = rpRecurData + "1" + mdDay;
+                                  break;
+                              case "Second": rpRecurData = rpRecurData + "2" + mdDay;
+                                  break;
+                              case "Third": rpRecurData = rpRecurData + "3" + mdDay;
+                                  break;
+                              case "Fourth": rpRecurData = rpRecurData + "4" + mdDay;
+                                  break;
+                              case "Last": rpRecurData = rpRecurData + "-1" + mdDay;
+                                  break;
+
+                              }
+                              rpRecurData = rpRecurData + ";";
+                              break;
+                          case "AbsoluteYearlyRecurrencePatternType": AbsoluteYearlyRecurrencePatternType
+                                  yaYearlyRecurrance = (AbsoluteYearlyRecurrencePatternType)rpRecurrancePattern;
+                              rpRecurData = rpRecurData + "RRULE:FREQ=YEARLY;";
+                              rpRecurData = rpRecurData + "BYMONTH=" +
+                                  mhMonthhash[yaYearlyRecurrance.Month.ToString().ToLower().Substring(0,
+                                                                                                      3)].ToString() + ";";
+                              rpRecurData = rpRecurData + "BYDAY=" +
+                                  yaYearlyRecurrance.DayOfMonth.ToString().Substring(0, 2) + ";";
+                              break;
+                          }
+                          string rtRangeType = rrRecurranceRange.GetType().Name.ToString();
+                          switch (rtRangeType)
+                          {
+                          case "NumberedRecurrenceRangeType": NumberedRecurrenceRangeType nrNumberRecRange
+                                  = (NumberedRecurrenceRangeType)rrRecurranceRange;
+                              rpRecurData = rpRecurData + "COUNT=" +
+                                  nrNumberRecRange.NumberOfOccurrences.ToString() + ";";
+                              break;
+                          case "EndDateRecurrenceRangeType": EndDateRecurrenceRangeType edDateRecRange =
+                                  (EndDateRecurrenceRangeType)rrRecurranceRange;
+                              rpRecurData = rpRecurData + "UNTIL=" +
+                                  edDateRecRange.EndDate.ToString("yyyyMMddTHHmmssZ") + ";";
+                              break;
+                          }
+                          rpRecurData = rpRecurData + "\r\n";
+                          Recurrence reRecurrence = new Recurrence();
+                          reRecurrence.Value = rpRecurData;
+                          cwCalenderWhen.StartTime = ciCalentry.Start;
+                          cwCalenderWhen.EndTime = ciCalentry.End;
+                          ceCalendarEntry.Recurrence = reRecurrence;
+
+
+                      } else {
+                          cwCalenderWhen.StartTime = ciCalentry.Start;
+                          cwCalenderWhen.EndTime = ciCalentry.End;
+                      }
+                  }
+
+                  ceCalendarEntry.Times.Add(cwCalenderWhen);
+                  if (ciCalentry.Location != null) {
+                      Where cwCalendarWhere = new Where();
+                      cwCalendarWhere.ValueString = ciCalentry.Location;
+                      ceCalendarEntry.Locations.Add(cwCalendarWhere);
+                  }
+                  ExtendedProperty exIDPropperty = new ExtendedProperty();
+                  exIDPropperty.Name = "http://msgdev.mvps.org/EWSItemID";
+                  exIDPropperty.Value = ciCreateItem.Item.ItemId.Id.ToString();
+                  ceCalendarEntry.ExtensionElements.Add(exIDPropperty);
+                  ExtendedProperty exIDPropperty1 = new ExtendedProperty();
+                  exIDPropperty1.Name = "http://msgdev.mvps.org/EWSChangeKey";
+                  exIDPropperty1.Value = ciCreateItem.Item.ItemId.ChangeKey.ToString();
+                  ceCalendarEntry.ExtensionElements.Add(exIDPropperty1);
+                  Uri piPostUri = new Uri(cuCalendarURL);
+                  AtomEntry insertedEntry = csGoogleCalendarServer.Insert(piPostUri,
+                                                                          ceCalendarEntry);
+              }
+
+          }
+      }
+  }
+
+#+END_SRC
+
+** Interesting sync client : http://sourceforge.net/p/googlesyncmod/code/HEAD/tree/trunk/GoogleContactsSync/AppointmentSync.cs
+
+** http://scand.com/products/outlook4gmail/install.html
+** http://syncoutlook.com/sync-exchange-calendar-with-google.aspx?pcode=310021174qxlld4&gclid=CjwKEAiAtf6zBRDS0oCLrL37gFUSJACr2JYbPfFNwH7AP84OSSTe2Po5EZEWcc-zoosz9HaKL1gu4xoCa2bw_wcB
