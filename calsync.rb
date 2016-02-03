@@ -127,7 +127,12 @@ def test3
   }
 end
 
-test1
+def test4
+  resp = @client.ews.resolve_names(:name => "Sharron", :full_contact_data => true)
+  puts resp.response_message[:elems][:resolution_set][:elems][0][:resolution][:elems][0]
+end
+
+test4
 
 # maxnum=512
 # opts[:calendar_view] = {:max_entries_returned => maxnum, :start_date => start_date, :end_date => end_date}
