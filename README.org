@@ -2,7 +2,7 @@ Not ready for use, still in preliminary development
 * Installation
 #+BEGIN_SRC sh
 sudo apt-get --assume-yes install rake ruby-dev
-cd Viewpoint; rake; sudo gem install ./viewpoint-1.0.0.gem
+cd Viewpoint; rake; gem install ./viewpoint-1.0.0.gem
 #+END_SRC
 
 * Viewpoint documentation
