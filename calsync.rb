@@ -90,28 +90,35 @@ def test1
   folders.each { |f| puts f.name }
 end
 
+require "awesome_print"
+
+def dump_item item
+  puts "Id:         #{item.id}"
+  #puts "ItemId:     #{item.item_id}" # contains id and change_key
+  puts "Subject:    #{item.subject}"
+  puts "Type:       #{item.ews_item[:calendar_item_type][:text]}"  # Single or RecurringMaster
+#  ap item.ews_item  # complete record
+  puts "Start:      #{item.start}"
+  puts "End:        #{item.end}"
+  puts "Location:   #{item.location}"
+  puts "Organizer:  #{item.organizer.name}"
+#  puts "OptionalAttendees: #{item.optional_attendees}"
+#  puts "RequiredAttendees: #{item.required_attendees}"
+  puts "Recurring:  #{item.recurring?}"
+  puts "Recurrence: #{item.recurrence}"
+  puts "ChangeKey:  #{item.change_key}"
+end
+
 def test2
   calendar = @client.get_folder :calendar
   sd = Date.iso8601 '2015-09-15'
 #  items = calendar.items_since sd
   items   = calendar.items
   items.each { |item|
+    puts "."
     next if item.recurrence.nil?
- #   next if (item.ews_item[:calendar_item_type][:text] == 'Single')
-    puts "Id:         #{item.id}"
-    #puts "ItemId:     #{item.item_id}" # contains id and change_key
-    puts "Subject:    #{item.subject}"
-    puts "Type:       #{item.ews_item[:calendar_item_type][:text]}"  # Single or RecurringMaster
-#    puts item.ews_item  # complete record
-#    puts "Start:      #{item.start}"
-#    puts "End:        #{item.end}"
-#    puts "Location:   #{item.location}"
-#    puts "Organizer:  #{item.organizer.name}"
-#    puts "OptionalAttendees: #{item.optional_attendees}"
-#    puts "RequiredAttendees: #{item.required_attendees}"
-#    puts "Recurring:  #{item.recurring?}"
-#    puts "Recurrence: #{item.recurrence}"
-#    puts "ChangeKey:  #{item.change_key}"
+    #   next if (item.ews_item[:calendar_item_type][:text] == 'Single')
+    dump_item item
     puts '--------------------------------------'
   }
 end
@@ -132,7 +139,27 @@ def test4
   puts resp.response_message[:elems][:resolution_set][:elems][0][:resolution][:elems][0]
 end
 
-test4
+def test5
+  calendar = @client.get_folder :calendar
+  puts "got calendar"
+  result = calendar.sync_items!(nil, 1)
+  dump_item result[:create].first
+  puts '--------------------------------------'
+
+  state = calendar.sync_state
+
+  result = calendar.sync_items!(state, 1)
+  dump_item result[:create].first
+  puts '--------------------------------------'
+
+  calendar = @client.get_folder :calendar
+  result = calendar.sync_items!(state, 1)
+  dump_item result[:create].first
+  puts '--------------------------------------'
+  # http://www.rubydoc.info/github/WinRb/Viewpoint/Viewpoint/EWS/Types/GenericFolder#subscribe-instance_method
+end
+
+test5
 
 # maxnum=512
 # opts[:calendar_view] = {:max_entries_returned => maxnum, :start_date => start_date, :end_date => end_date}
