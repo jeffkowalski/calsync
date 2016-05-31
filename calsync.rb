@@ -8,8 +8,9 @@ require 'andand'
 require 'awesome_print'
 
 
-CREDENTIALS_PATH = File.join('.', '.credentials', "calsync.json")
-
+#####
+##### begin workaround logging issues in Viewpoint
+#####
 class Z
   def debug?
     return false
@@ -42,6 +43,14 @@ class Viewpoint::EWS::Types::Folder
     return Z.new
   end
 end
+#####
+##### end workaround logging issues in Viewpoint
+#####
+
+
+#####
+#####
+#####
 
 begin
   require 'io/console'
@@ -59,6 +68,8 @@ else
   end
 end
 
+CREDENTIALS_PATH = File.join('.', '.credentials', "calsync.json")
+
 # read endpoint and user from file
 file = File.read(CREDENTIALS_PATH)
 parsed = JSON.parse(file)
@@ -70,27 +81,12 @@ if @client.nil?
   puts "no client"
   exit
 end
+
+
 #####
 #####
 #####
 
-
-def test0
-  calendar = @client.get_folder :calendar
-  events   = calendar.items
-  [events.first].each { |event|
-    puts event.subject
-    # puts event.start_time
-    # puts event.end_time
-    puts event.required_attendees.map { |attendee| attendee.name }
-    puts
-  }
-end
-
-def test1
-  folders = @client.folders
-  folders.each { |f| puts f.name }
-end
 
 def dump_item item
   puts "Id:         #{item.id}"
@@ -111,7 +107,13 @@ def dump_item item
   puts "ChangeKey:  #{item.change_key}"
 end
 
-def test2
+
+def test_dump_folders
+  folders = @client.folders
+  folders.each { |f| puts f.name }
+end
+
+def test_recurrence
   calendar = @client.get_folder :calendar
   sd = Date.iso8601 '2015-09-15'
 #  items = calendar.items_since sd
@@ -125,7 +127,7 @@ def test2
   }
 end
 
-def test3
+def test_dump_item
   calendar = @client.get_folder :calendar
   events   = calendar.items
   [events.first].each { |event|
@@ -136,12 +138,12 @@ def test3
   }
 end
 
-def test4
+def test_lookup_name
   resp = @client.ews.resolve_names(:name => "Sharron", :full_contact_data => true)
   puts resp.response_message[:elems][:resolution_set][:elems][0][:resolution][:elems][0]
 end
 
-def test5
+def test_sync_state
   calendar = @client.get_folder :calendar
   puts "got calendar"
   result = calendar.sync_items!(nil, 1)
@@ -161,7 +163,7 @@ def test5
   # http://www.rubydoc.info/github/WinRb/Viewpoint/Viewpoint/EWS/Types/GenericFolder#subscribe-instance_method
 end
 
-def test6
+def test_count_sync
   calendar = @client.get_folder :calendar
   puts "got calendar"
   while not calendar.synced?
@@ -172,4 +174,4 @@ def test6
   end
 end
 
-test5
+test_count_sync
