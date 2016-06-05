@@ -12,7 +12,9 @@ require 'thor'
 
 require 'json'
 require 'andand'
-require 'awesome_print'
+require 'pp'
+require 'nokogiri'
+require 'loofah'
 
 LOGFILE = File.join(Dir.home, '.calsync.log')
 
@@ -145,15 +147,15 @@ class CalSync < Thor
       puts "ItemId:     #{item.item_id}" # contains id and change_key
       puts "Subject:    #{item.subject}"
       puts "Type:       #{item.ews_item[:calendar_item_type][:text]}"  # Single or RecurringMaster
-      #  ap item.ews_item  # complete record
+      #  pp item.ews_item  # complete record
       puts "Start:      #{item.start}"
       puts "End:        #{item.end}"
       puts "Location:   #{item.location}"
       puts "Organizer:  #{item.organizer.name}"
       puts "OptionalAttendees:"
-      ap item.optional_attendees #returns Array of MailboxUser
+      pp item.optional_attendees #returns Array of MailboxUser
       puts "RequiredAttendees:"
-      ap item.required_attendees.map { |attendee| attendee.name } #returns Array of MailboxUser
+      pp item.required_attendees.map { |attendee| attendee.name } #returns Array of MailboxUser
       puts "Recurring:  #{item.recurring?}"
       puts "Recurrence: #{item.recurrence}"
       puts "ChangeKey:  #{item.change_key}"
@@ -253,6 +255,19 @@ class CalSync < Thor
     end
   end
 
+  no_commands {
+    def reformat_body body
+      doc = Loofah.document(body).scrub!(:whitewash)
+      txt = doc.text
+      txt.gsub!(/(&#13;)*/, '') # carriage return
+      txt.gsub!(/\u00A0/, ' ')   # non-breaking space -> space
+      txt.strip!
+      txt.gsub!(/[ \t]+\n/, "\n")
+      txt.gsub!(/\n\n\n/, "\n\n")
+      return txt.empty? ? nil : txt
+    end
+  }
+
   desc "forward_sync", "sync creates from outlook to google"
   def forward_sync
     google_client = auth
@@ -264,14 +279,16 @@ class CalSync < Thor
     outlook_calendar = @client.get_folder :calendar
     $logger.info 'got outlook calendar'
 
+    state = nil
     while not outlook_calendar.synced?
-      result = outlook_calendar.sync_items!
+      result = outlook_calendar.sync_items!(state, 256)
       result[:create].andand.each { |outlook_event|
         google_event = Google::Apis::CalendarV3::Event.new(
           {
             summary: outlook_event.subject,
             location: outlook_event.location,
-            # description: 'A chance to hear more about Google\'s developer products.',
+            description: reformat_body(outlook_event.body),
+            #id: outlook_event.id,
             start: {
               date_time: outlook_event.start,
               # time_zone: 'America/Los_Angeles'
@@ -296,12 +313,21 @@ class CalSync < Thor
             #      },
           }
         )
-        # ap google_event
+        #$logger.info google_event
         # https://developers.google.com/google-apps/calendar/v3/reference/events/insert
-        result = google_client.insert_event google_calendar.id, google_event
-        $logger.info result
+        begin
+          result = google_client.insert_event google_calendar.id, google_event
+          $logger.info PP.pp(result, "")
+          state = outlook_calendar.sync_state
+          rescue Exception => e
+            $logger.error e.message
+            $logger.error e.backtrace.inspect
+            exit
+        end
+        $logger.info ""
       }
     end
+    $logger.info 'done syncing'
   end
 
   desc "scan", "Scan calendar"

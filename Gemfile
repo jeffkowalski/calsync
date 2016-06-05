@@ -1,9 +1,10 @@
 source 'https://rubygems.org'
 ruby '2.3.0'
-gem 'awesome_print'
+gem 'loofah'
 gem 'google-api-client', '0.9'
 gem 'andand'
 gem 'thor'
+
 
 # for robe:
 gem 'pry'
