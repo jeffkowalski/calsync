@@ -15,9 +15,10 @@ require 'andand'
 require 'pp'
 require 'nokogiri'
 require 'loofah'
+require "yaml/store"
 
 LOGFILE = File.join(Dir.home, '.calsync.log')
-
+DATAFILE = File.join(Dir.home, '.calsync_data.yml')
 EWS_CREDENTIALS_PATH = File.join('.', '.credentials', "calsync.json")
 
 OOB_URI = 'urn:ietf:wg:oauth:2.0:oob'
@@ -143,22 +144,27 @@ class CalSync < Thor
     end
 
     def dump_item item
-      puts "Id:         #{item.id}"
-      puts "ItemId:     #{item.item_id}" # contains id and change_key
-      puts "Subject:    #{item.subject}"
-      puts "Type:       #{item.ews_item[:calendar_item_type][:text]}"  # Single or RecurringMaster
-      #  pp item.ews_item  # complete record
-      puts "Start:      #{item.start}"
-      puts "End:        #{item.end}"
-      puts "Location:   #{item.location}"
-      puts "Organizer:  #{item.organizer.name}"
-      puts "OptionalAttendees:"
-      pp item.optional_attendees #returns Array of MailboxUser
-      puts "RequiredAttendees:"
-      pp item.required_attendees.map { |attendee| attendee.name } #returns Array of MailboxUser
-      puts "Recurring:  #{item.recurring?}"
-      puts "Recurrence: #{item.recurrence}"
-      puts "ChangeKey:  #{item.change_key}"
+      puts "Id=         \"#{item.id}\""
+      puts "ItemId=     "
+      pp item.item_id  # contains id and change_key
+      puts "Subject=    "
+      pp item.subject
+      puts "Type=       \"#{item.ews_item[:calendar_item_type][:text]}\""  # Single or RecurringMaster
+      puts "Start=      \"#{item.start}\""
+      puts "End=        \"#{item.end}\""
+      puts "Location=   "
+      pp item.location
+      puts "Organizer=  \"#{item.organizer.name}\""
+      puts "RequiredAttendees="
+      pp item.required_attendees.map { |attendee| "#{attendee.name} <#{attendee.email_address}>" } #returns Array of MailboxUser
+      puts "OptionalAttendees="
+      pp item.optional_attendees.map { |attendee| "#{attendee.name} <#{attendee.email_address}>" } #returns Array of MailboxUser
+      puts "Recurring=  #{item.recurring?}"
+      puts "Recurrence= "
+      pp item.recurrence
+      puts "ChangeKey=  \"#{item.change_key}\""
+      puts "EWSItem=    "
+      pp item.ews_item  # complete record
     end
   }
 
@@ -188,15 +194,14 @@ class CalSync < Thor
   def test_recurrence
     ews_login
     calendar = @client.get_folder :calendar
-    sd = Date.iso8601 '2015-09-15'
-    #  items = calendar.items_since sd
-    items   = calendar.items
+    # items = calendar.items_since(Date.iso8601 '2015-09-15')
+    items = calendar.items
     items.each { |item|
-      puts "."
-      next if item.recurrence.nil?
+      #puts "#"
+      next if item.recurrence.nil? || item.recurring?
       #   next if (item.ews_item[:calendar_item_type][:text] == 'Single')
       dump_item item
-      puts '--------------------------------------'
+      puts '#--------------------------------------'
     }
   end
 
@@ -258,12 +263,12 @@ class CalSync < Thor
   no_commands {
     def reformat_body body
       doc = Loofah.document(body).scrub!(:whitewash)
-      txt = doc.text
-      txt.gsub!(/(&#13;)*/, '') # carriage return
+      txt = doc.text(:encode_special_chars => false)
+      txt.gsub!(/\r/, '')        # carriage return
       txt.gsub!(/\u00A0/, ' ')   # non-breaking space -> space
       txt.strip!
+      txt.gsub!(/\n\s*\n\s*\n/,"\n\n")
       txt.gsub!(/[ \t]+\n/, "\n")
-      txt.gsub!(/\n\n\n/, "\n\n")
       return txt.empty? ? nil : txt
     end
   }
@@ -279,9 +284,11 @@ class CalSync < Thor
     outlook_calendar = @client.get_folder :calendar
     $logger.info 'got outlook calendar'
 
-    state = nil
+    store = YAML::Store.new(DATAFILE)
+
+    state = store.transaction { store.fetch(:state, nil) }
     while not outlook_calendar.synced?
-      result = outlook_calendar.sync_items!(state, 256)
+      result = outlook_calendar.sync_items!(state, 1)
       result[:create].andand.each { |outlook_event|
         google_event = Google::Apis::CalendarV3::Event.new(
           {
@@ -318,7 +325,10 @@ class CalSync < Thor
         begin
           result = google_client.insert_event google_calendar.id, google_event
           $logger.info PP.pp(result, "")
-          state = outlook_calendar.sync_state
+          store.transaction {
+            state = outlook_calendar.sync_state
+            store[:state] = state
+          }
           rescue Exception => e
             $logger.error e.message
             $logger.error e.backtrace.inspect
