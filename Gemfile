@@ -1,10 +1,11 @@
 source 'https://rubygems.org'
-ruby '2.3.0'
+ruby '2.3.1'
 gem 'loofah'
 gem 'google-api-client', '0.9'
 gem 'andand'
 gem 'thor'
 
+gem "viewpoint", github: "jeffkowalski/Viewpoint", branch: "master"
 
 # for robe:
 gem 'pry'

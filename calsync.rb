@@ -1,5 +1,9 @@
 #!/usr/bin/env ruby
 
+require 'rubygems'
+require 'bundler'
+Bundler.require(:default)
+
 require 'viewpoint'
 include Viewpoint::EWS
 
@@ -194,8 +198,8 @@ class CalSync < Thor
   def test_recurrence
     ews_login
     calendar = @client.get_folder :calendar
-    # items = calendar.items_since(Date.iso8601 '2015-09-15')
-    items = calendar.items
+    items = calendar.items_since(Date.iso8601 '2015-09-15')
+    # items = calendar.items
     items.each { |item|
       #puts "#"
       next if item.recurrence.nil? || item.recurring?
