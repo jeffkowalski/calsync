@@ -126,7 +126,6 @@ class CalSync < Thor
       end
     end
 
-
     def redirect_output
       unless LOGFILE == 'STDOUT'
         logfile = File.expand_path(LOGFILE)
@@ -147,28 +146,29 @@ class CalSync < Thor
       $logger.info 'starting'
     end
 
-    def dump_item item
-      puts "Id=         \"#{item.id}\""
-      puts "ItemId=     "
-      pp item.item_id  # contains id and change_key
-      puts "Subject=    "
-      pp item.subject
-      puts "Type=       \"#{item.ews_item[:calendar_item_type][:text]}\""  # Single or RecurringMaster
-      puts "Start=      \"#{item.start}\""
-      puts "End=        \"#{item.end}\""
-      puts "Location=   "
-      pp item.location
-      puts "Organizer=  \"#{item.organizer.name}\""
-      puts "RequiredAttendees="
-      pp item.required_attendees.map { |attendee| "#{attendee.name} <#{attendee.email_address}>" } #returns Array of MailboxUser
-      puts "OptionalAttendees="
-      pp item.optional_attendees.map { |attendee| "#{attendee.name} <#{attendee.email_address}>" } #returns Array of MailboxUser
-      puts "Recurring=  #{item.recurring?}"
-      puts "Recurrence= "
-      pp item.recurrence
-      puts "ChangeKey=  \"#{item.change_key}\""
-      puts "EWSItem=    "
-      pp item.ews_item  # complete record
+    def dump_item item, io=nil
+      io ||= $>
+      io.puts "Id=         \"#{item.id}\""
+      io.puts "ItemId=     "
+      PP.pp(item.item_id, io)  # contains id and change_key
+      io.puts "Subject=    "
+      PP.pp(item.subject, io)
+      io.puts "Type=       \"#{item.ews_item[:calendar_item_type][:text]}\""  # Single or RecurringMaster
+      io.puts "Start=      \"#{item.start}\""
+      io.puts "End=        \"#{item.end}\""
+      io.puts "Location=   "
+      PP.pp(item.location, io)
+      io.puts "Organizer=  \"#{item.organizer.name}\""
+      io.puts "RequiredAttendees="
+      PP.pp(item.required_attendees.map { |attendee| "#{attendee.name} <#{attendee.email_address}>" }, io) #returns Array of MailboxUser
+      io.puts "OptionalAttendees="
+      PP.pp(item.optional_attendees.map { |attendee| "#{attendee.name} <#{attendee.email_address}>" }, io) #returns Array of MailboxUser
+      io.puts "Recurring=  #{item.recurring?}"
+      io.puts "Recurrence= "
+      PP.pp(item.recurrence, io)
+      io.puts "ChangeKey=  \"#{item.change_key}\""
+      io.puts "EWSItem=    "
+      PP.pp(item.ews_item, io)  # complete record
     end
   }
 
@@ -216,8 +216,7 @@ class CalSync < Thor
     events   = calendar.items
     [events.first].each { |event|
       puts event.methods
-      puts event.ews_item
-      puts event.extended_properties
+      dump_item event
       return
     }
   end
