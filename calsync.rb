@@ -360,8 +360,8 @@ class CalSync < Thor
     $logger.info 'done syncing'
   end
 
-  desc "scan", "Scan calendar"
-  def scan
+  desc "test_create_gcal", "test creation of an item on google calendar"
+  def test_create_gcal
     client = auth
     result = client.list_calendar_lists
     calendar = result.items.select { |item| item.summary == 'outlook' }.first
