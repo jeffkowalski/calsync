@@ -209,6 +209,23 @@ class CalSync < Thor
     }
   end
 
+  desc "test_find_types", "collect types of appointments"
+  def test_find_types
+    ews_login
+    calendar = @client.get_folder :calendar
+    #items = calendar.items_since(Date.iso8601 '2015-09-15')
+    types = {}
+    items = calendar.items({:calendar_view => {:max_entries_returned => 20, :start_date => (DateTime.parse '2015-09-15'), :end_date => (DateTime.now)}})
+    items.each { |item|
+      types[item.ews_item[:calendar_item_type][:text]] = true
+      if item.ews_item[:calendar_item_type][:text] == 'Exception'
+        dump_item item
+        exit
+      end
+    }
+    puts types.keys
+  end
+
   desc "test_dump_item", "show first calendar item"
   def test_dump_item
     ews_login
