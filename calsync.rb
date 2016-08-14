@@ -13,6 +13,7 @@ require 'google/apis/calendar_v3'
 require 'fileutils'
 require 'logger'
 require 'thor'
+require 'symmetric-encryption'
 
 require 'json'
 require 'andand'
@@ -24,6 +25,8 @@ require "yaml/store"
 LOGFILE = File.join(Dir.home, '.calsync.log')
 DATAFILE = File.join(Dir.home, '.calsync_data.yml')
 EWS_CREDENTIALS_PATH = File.join('.', '.credentials', "calsync.json")
+CIPHER_KEY = 'l7ChJnmH13diyd305HWAoLe8ok20uxv8'
+CIPHER_IV = 'FA5B9BCBDBB98921'
 
 OOB_URI = 'urn:ietf:wg:oauth:2.0:oob'
 APPLICATION_NAME = 'calsync'
@@ -118,7 +121,13 @@ class CalSync < Thor
       parsed = JSON.parse(file)
       endpoint = parsed['endpoint']
       user = parsed['user']
-      pass = get_password("password for #{user} at #{endpoint}: "); puts
+      #pass = get_password("password for #{user} at #{endpoint}: "); puts
+      SymmetricEncryption.cipher = SymmetricEncryption::Cipher.new(
+        key:         CIPHER_KEY,
+        iv:          CIPHER_IV,
+        cipher_name: 'aes-128-cbc'
+      )
+      pass = SymmetricEncryption.decrypt parsed['password']
       @client = Viewpoint::EWSClient.new endpoint, user, pass
       if @client.nil?
         puts "no client"
@@ -292,6 +301,18 @@ class CalSync < Thor
       return txt.empty? ? nil : txt
     end
   }
+
+  desc 'encrypt', 'encrypt a string'
+  def encrypt
+    SymmetricEncryption.cipher = SymmetricEncryption::Cipher.new(
+      key:         CIPHER_KEY,
+      iv:          CIPHER_IV,
+      cipher_name: 'aes-128-cbc'
+    )
+    secret = get_password
+    puts
+    p SymmetricEncryption.encrypt secret
+  end
 
   desc "forward_sync", "sync creates from outlook to google"
   def forward_sync

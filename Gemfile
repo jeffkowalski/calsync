@@ -4,6 +4,7 @@ gem 'loofah'
 gem 'google-api-client', '0.9'
 gem 'andand'
 gem 'thor'
+gem 'symmetric-encryption'
 
 gem "viewpoint", github: "jeffkowalski/Viewpoint", branch: "master"
 
