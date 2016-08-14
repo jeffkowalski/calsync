@@ -309,6 +309,48 @@ class CalSync < Thor
     state = store.transaction { store.fetch(:state, nil) }
     while not outlook_calendar.synced?
       result = outlook_calendar.sync_items!(state, 1)
+
+      [:update, :read_flag_change].each { |key|
+        result[key].andand.each { |outlook_event|
+          begin
+            File.open("/home/jeff/calendar.txt", "a") do |ff|
+              ff.puts "#{key} #{DateTime.now} ========================================="
+              PP.pp(outlook_event.ews_item, ff)
+            end
+            $logger.info PP.pp(result, "")
+            store.transaction {
+              state = outlook_calendar.sync_state
+              store[:state] = state
+            }
+          rescue Exception => e
+            $logger.error e.message
+            $logger.error e.backtrace.inspect
+            exit
+          end
+          $logger.info ""
+        }
+      }
+
+      key = :delete
+      result[key].andand.each { |outlook_event|
+        begin
+          File.open("/home/jeff/calendar.txt", "a") do |ff|
+            ff.puts "#{key} #{DateTime.now} ========================================="
+            PP.pp(outlook_event, ff)
+          end
+          $logger.info PP.pp(result, "")
+          store.transaction {
+            state = outlook_calendar.sync_state
+            store[:state] = state
+          }
+        rescue Exception => e
+          $logger.error e.message
+          $logger.error e.backtrace.inspect
+          exit
+        end
+        $logger.info ""
+      }
+
       result[:create].andand.each { |outlook_event|
         google_event = Google::Apis::CalendarV3::Event.new(
           {
@@ -340,19 +382,25 @@ class CalSync < Thor
             #      },
           }
         )
+
         #$logger.info google_event
-        # https://developers.google.com/google-apps/calendar/v3/reference/events/insert
+
         begin
-          result = google_client.insert_event google_calendar.id, google_event
+          File.open("/home/jeff/calendar.txt", "a") do |ff|
+            ff.puts "#{key} #{DateTime.now} ========================================="
+            dump_item outlook_event, ff
+          end
+          # https://developers.google.com/google-apps/calendar/v3/reference/events/insert
+          #result = google_client.insert_event google_calendar.id, google_event
           $logger.info PP.pp(result, "")
           store.transaction {
             state = outlook_calendar.sync_state
             store[:state] = state
           }
-          rescue Exception => e
-            $logger.error e.message
-            $logger.error e.backtrace.inspect
-            exit
+        rescue Exception => e
+          $logger.error e.message
+          $logger.error e.backtrace.inspect
+          exit
         end
         $logger.info ""
       }
