@@ -439,3 +439,4 @@ http://gsexdev.blogspot.com/2007/06/using-exchange-web-services-to-create.html
 
 ** http://scand.com/products/outlook4gmail/install.html
 ** http://syncoutlook.com/sync-exchange-calendar-with-google.aspx?pcode=310021174qxlld4&gclid=CjwKEAiAtf6zBRDS0oCLrL37gFUSJACr2JYbPfFNwH7AP84OSSTe2Po5EZEWcc-zoosz9HaKL1gu4xoCa2bw_wcB
+** [[https://msdn.microsoft.com/en-us/library/office/dd633700(v=exchg.80).aspx][Accessing calendar items in a recurring series by using the EWS Managed API 2.0]]
