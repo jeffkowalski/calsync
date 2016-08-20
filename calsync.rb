@@ -338,7 +338,7 @@ class CalSync < Thor
               ff.puts "#{key} #{DateTime.now} ========================================="
               PP.pp(outlook_event.ews_item, ff)
             end
-            $logger.info PP.pp(result, "")
+            $logger.info PP.pp(outlook_event, "")
             store.transaction {
               state = outlook_calendar.sync_state
               store[:state] = state
@@ -359,7 +359,7 @@ class CalSync < Thor
             ff.puts "#{key} #{DateTime.now} ========================================="
             PP.pp(outlook_event, ff)
           end
-          $logger.info PP.pp(result, "")
+          $logger.info PP.pp(outlook_event, "")
           store.transaction {
             state = outlook_calendar.sync_state
             store[:state] = state
@@ -413,7 +413,7 @@ class CalSync < Thor
           end
           # https://developers.google.com/google-apps/calendar/v3/reference/events/insert
           #result = google_client.insert_event google_calendar.id, google_event
-          $logger.info PP.pp(result, "")
+          $logger.info PP.pp(outlook_event, "")
           store.transaction {
             state = outlook_calendar.sync_state
             store[:state] = state
