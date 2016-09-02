@@ -331,28 +331,49 @@ class CalSync < Thor
     while not outlook_calendar.synced?
       result = outlook_calendar.sync_items!(state, 1)
 
-      [:update, :read_flag_change].each { |key|
-        result[key].andand.each { |outlook_event|
-          begin
-            File.open("/home/jeff/calendar.txt", "a") do |ff|
-              ff.puts "#{key} #{DateTime.now} ========================================="
+      key = :update
+      result[key].andand.each { |outlook_event|
+        begin
+          File.open("/home/jeff/calendar.txt", "a") do |ff|
+            ff.puts "#{key} #{DateTime.now} ========================================="
+            PP.pp(outlook_event.ews_item, ff)
+          end
+          $logger.info key
+          $logger.info PP.pp(outlook_event.ews_item, "")
+          store.transaction {
+            state = outlook_calendar.sync_state
+            store[:state] = state
+          }
+        rescue Exception => e
+          $logger.error e.message
+          $logger.error e.backtrace.inspect
+          exit
+        end
+        $logger.info ""
+      }
+
+      key = :read_flag_change
+      result[key].andand.each { |outlook_event|
+        begin
+          File.open("/home/jeff/calendar.txt", "a") do |ff|
+            ff.puts "#{key} #{DateTime.now} ========================================="
               PP.pp(outlook_event.ews_item, ff)
-            end
-            $logger.info key
+          end
+          $logger.info key
             $logger.info PP.pp(outlook_event.ews_item, "")
             store.transaction {
               state = outlook_calendar.sync_state
               store[:state] = state
             }
-          rescue Exception => e
+        rescue Exception => e
             $logger.error e.message
             $logger.error e.backtrace.inspect
             exit
-          end
-          $logger.info ""
-        }
+        end
+        $logger.info ""
       }
 
+      # delete records have only id and change key
       key = :delete
       result[key].andand.each { |outlook_event|
         begin
@@ -374,7 +395,8 @@ class CalSync < Thor
         $logger.info ""
       }
 
-      result[:create].andand.each { |outlook_event|
+      key = :create
+      result[key].andand.each { |outlook_event|
         google_event = Google::Apis::CalendarV3::Event.new(
           {
             summary: outlook_event.subject,
@@ -413,10 +435,12 @@ class CalSync < Thor
             ff.puts "#{key} #{DateTime.now} ========================================="
             dump_item outlook_event, ff
           end
-          # https://developers.google.com/google-apps/calendar/v3/reference/events/insert
-          #result = google_client.insert_event google_calendar.id, google_event
           $logger.info key
           $logger.info PP.pp(outlook_event, "")
+
+          # https://developers.google.com/google-apps/calendar/v3/reference/events/insert
+          #result = google_client.insert_event google_calendar.id, google_event
+
           store.transaction {
             state = outlook_calendar.sync_state
             store[:state] = state
