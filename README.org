@@ -40,10 +40,20 @@ Sync calendars
 ** blog at http://distributed-frostbite.blogspot.com/2010/08/viewpoint-for-exchange-web-services.html#comment-form
 
 * Notes
-** microsoft EWS api at https://msdn.microsoft.com/en-us/library/office/dd633696(v=exchg.80).aspx
+** EWS
+*** [[https://msdn.microsoft.com/en-us/library/office/dd633696(v=exchg.80).aspx][Working with the EWS Managed API 2.0]]
+*** [[https://msdn.microsoft.com/en-us/library/office/dd633702][Working with calendar items by using the EWS Managed API 2.0]]
+**** [[https://msdn.microsoft.com/en-us/library/office/dn439786][How to: Retrieve appointments and meetings by using the EWS Managed API 2.0]]
+**** [[https://msdn.microsoft.com/en-us/library/office/dd633684(v=exchg.80).aspx][Overview of a recurring series in the EWS Managed API 2.0]]
+**** [[https://msdn.microsoft.com/en-us/library/office/dd633700(v=exchg.80).aspx][Accessing calendar items in a recurring series by using the EWS Managed API 2.0]]
+*** [[https://code.msdn.microsoft.com/office/Exchange-2013-101-Code-3c38582c][Exchange 2013 101 Code Samples]]
+**** [[https://code.msdn.microsoft.com/vstudio/Exchange-2013-Accessing-d73f971d/sourcecode?fileId=83035&pathId=165845440][Exchange 2013: Access calendar items in a recurring series programmatically]]
+**** [[https://code.msdn.microsoft.com/Exchange-2013-Create-f298c116/sourcecode?fileId=60289&pathId=1193725836][Exchange 2013: Create recurring tasks programmatically on Exchange servers]]
+**** [[https://code.msdn.microsoft.com/exchange/Exchange-2013-Update-a-51bb8fa7/sourcecode?fileId=83758&pathId=1417188839][Exchange 2013: Update a recurring series programmatically on Exchange servers]]
 
-** Using Exchange Web Services to create appointments in the Google Calendar using the Google Calendar API
-http://gsexdev.blogspot.com/2007/06/using-exchange-web-services-to-create.html
+
+** [[http://gsexdev.blogspot.com/2007/06/using-exchange-web-services-to-create.html][Using Exchange Web Services to create appointments in the Google Calendar using the Google Calendar API]]
+
 #+BEGIN_SRC C++
   using System;
   using System.Collections;
@@ -435,8 +445,11 @@ http://gsexdev.blogspot.com/2007/06/using-exchange-web-services-to-create.html
 
 #+END_SRC
 
-** Interesting sync client : http://sourceforge.net/p/googlesyncmod/code/HEAD/tree/trunk/GoogleContactsSync/AppointmentSync.cs
 
-** http://scand.com/products/outlook4gmail/install.html
-** http://syncoutlook.com/sync-exchange-calendar-with-google.aspx?pcode=310021174qxlld4&gclid=CjwKEAiAtf6zBRDS0oCLrL37gFUSJACr2JYbPfFNwH7AP84OSSTe2Po5EZEWcc-zoosz9HaKL1gu4xoCa2bw_wcB
-** [[https://msdn.microsoft.com/en-us/library/office/dd633700(v=exchg.80).aspx][Accessing calendar items in a recurring series by using the EWS Managed API 2.0]]
+** Other Clients
+*** Open
+**** [[https://sourceforge.net/projects/googlesyncmod/][GO Contact Sync Mod]]
+[[http://sourceforge.net/p/googlesyncmod/code/HEAD/tree/trunk/GoogleContactsSync/AppointmentSync.cs][AppointmentSync.cs]]
+*** Closed source, commercial
+**** [[http://scand.com/products/outlook4gmail/install.html][Outlook4Gmail]]
+**** [[http://syncoutlook.com/sync-exchange-calendar-with-google.aspx?pcode=310021174qxlld4&gclid=CjwKEAiAtf6zBRDS0oCLrL37gFUSJACr2JYbPfFNwH7AP84OSSTe2Po5EZEWcc-zoosz9HaKL1gu4xoCa2bw_wcB][Google Calendar Exchange sync using Sync2]]
