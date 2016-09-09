@@ -450,6 +450,8 @@ Sync calendars
 *** Open
 **** [[https://sourceforge.net/projects/googlesyncmod/][GO Contact Sync Mod]]
 [[http://sourceforge.net/p/googlesyncmod/code/HEAD/tree/trunk/GoogleContactsSync/AppointmentSync.cs][AppointmentSync.cs]]
+**** [[http://ankeshdave.github.io/CalendarSyncplus/][calendarsyncplus]]
+**** [[http://outlookgooglecalendarsync.codeplex.com/][outlookgooglecalendarsync]]
 *** Closed source, commercial
 **** [[http://scand.com/products/outlook4gmail/install.html][Outlook4Gmail]]
 **** [[http://syncoutlook.com/sync-exchange-calendar-with-google.aspx?pcode=310021174qxlld4&gclid=CjwKEAiAtf6zBRDS0oCLrL37gFUSJACr2JYbPfFNwH7AP84OSSTe2Po5EZEWcc-zoosz9HaKL1gu4xoCa2bw_wcB][Google Calendar Exchange sync using Sync2]]
